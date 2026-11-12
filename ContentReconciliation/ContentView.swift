@@ -10,7 +10,7 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 12) {
 
             HStack {
-                Button("Импорт из Excel…") {
+                Button("Импорт UID Login…") {
                     vm.showImporter = true
                 }
                 .keyboardShortcut("o", modifiers: .command)

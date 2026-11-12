@@ -3,7 +3,9 @@ import CoreXLSX
 
 enum XLSXReader {
 
-    /// Читает столбцы uid и login с первого листа. Шаги передаются в `progress`.
+    static let sheetName = "Лист1"
+
+    /// Читает столбцы uid и login с листа «Лист1». Шаги передаются в `progress`.
     static func readUIDLogin(from path: String, progress: (String) -> Void) throws -> [UserRecord] {
         progress("Открываю Excel-файл…")
         // XLSXFile(filepath:) возвращает опционал и не выбрасывает ошибку, поэтому без try
@@ -11,15 +13,25 @@ enum XLSXReader {
             throw ImportError.cannotOpen(path)
         }
 
-        progress("Читаю общие строки и список листов…")
+        progress("Читаю общие строки…")
         let sharedStrings = try file.parseSharedStrings()
 
-        guard let sheetPath = try file.parseWorksheetPaths().first else {
+        progress("Ищу лист «\(sheetName)»…")
+        guard let workbook = try file.parseWorkbooks().first else {
             throw ImportError.noSheets
         }
+        let sheets = try file.parseWorksheetPathsAndNames(workbook: workbook)
+        let available = sheets.compactMap { $0.name?.trimmingCharacters(in: .whitespaces) }
+        progress("Листы в файле: \(available.joined(separator: ", "))")
 
-        progress("Читаю первый лист: \(sheetPath)")
-        let worksheet = try file.parseWorksheet(at: sheetPath)
+        guard let sheet = sheets.first(where: {
+            $0.name?.trimmingCharacters(in: .whitespaces) == sheetName
+        }) else {
+            throw ImportError.sheetNotFound(sheetName)
+        }
+
+        progress("Читаю лист «\(sheetName)» (\(sheet.path))…")
+        let worksheet = try file.parseWorksheet(at: sheet.path)
         guard let rows = worksheet.data?.rows, let header = rows.first else {
             throw ImportError.emptySheet
         }

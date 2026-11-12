@@ -17,6 +17,7 @@ enum ImportError: LocalizedError {
     case cannotOpen(String)
     case noSheets
     case emptySheet
+    case sheetNotFound(String)
     case columnsNotFound([String])
 
     var errorDescription: String? {
@@ -27,6 +28,8 @@ enum ImportError: LocalizedError {
             return "В файле нет листов"
         case .emptySheet:
             return "Первый лист пуст"
+        case .sheetNotFound(let name):
+            return "В файле нет листа «\(name)»"
         case .columnsNotFound(let names):
             return "Не найдены столбцы: \(names.joined(separator: ", "))"
         }
