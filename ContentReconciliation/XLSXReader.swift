@@ -4,6 +4,7 @@ import CoreXLSX
 enum XLSXReader {
 
     static let sheetName = "Лист1"
+    static let maxHeaderSearchRows = 50
 
     /// Читает столбцы uid и login с листа «Лист1». Шаги передаются в `progress`.
     static func readUIDLogin(from path: String, progress: (String) -> Void) throws -> [UserRecord] {
@@ -32,35 +33,60 @@ enum XLSXReader {
 
         progress("Читаю лист «\(sheetName)» (\(sheet.path))…")
         let worksheet = try file.parseWorksheet(at: sheet.path)
-        guard let rows = worksheet.data?.rows, let header = rows.first else {
+        guard let rows = worksheet.data?.rows, !rows.isEmpty else {
             throw ImportError.emptySheet
         }
 
-        progress("Ищу столбцы uid и login в первой строке…")
-        var uidColumn: String?
-        var loginColumn: String?
-        for cell in header.cells {
-            let name = text(of: cell, sharedStrings)
-                .trimmingCharacters(in: .whitespaces)
-                .lowercased()
-            if name == "uid"   { uidColumn = cell.reference.column.value }
-            if name == "login" { loginColumn = cell.reference.column.value }
+        progress("Ищу строку заголовков с uid и login (первые \(maxHeaderSearchRows) строк)…")
+        var headerIndex: Int?
+        var uidCol: String?
+        var loginCol: String?
+        var sampleHeaders: [String] = []
+
+        for (index, row) in rows.prefix(maxHeaderSearchRows).enumerated() {
+            var uid: String?
+            var login: String?
+            var rowTexts: [String] = []
+
+            for cell in row.cells {
+                let raw = text(of: cell, sharedStrings)
+                let name = normalize(raw)
+                if !name.isEmpty {
+                    rowTexts.append("\(cell.reference.column.value)=«\(name)»")
+                }
+                if name == "uid"   { uid = cell.reference.column.value }
+                if name == "login" { login = cell.reference.column.value }
+            }
+
+            if sampleHeaders.count < 5 && !rowTexts.isEmpty {
+                sampleHeaders.append("строка \(index + 1): " + rowTexts.joined(separator: ", "))
+            }
+
+            if let uid, let login {
+                headerIndex = index
+                uidCol = uid
+                loginCol = login
+                break
+            }
         }
 
-        var missing: [String] = []
-        if uidColumn == nil { missing.append("uid") }
-        if loginColumn == nil { missing.append("login") }
-        guard missing.isEmpty, let uidCol = uidColumn, let loginCol = loginColumn else {
+        guard let headerIndex, let uidColumn = uidCol, let loginColumn = loginCol else {
+            for line in sampleHeaders {
+                progress("Непустые строки: \(line)")
+            }
+            var missing: [String] = []
+            if uidCol == nil { missing.append("uid") }
+            if loginCol == nil { missing.append("login") }
             throw ImportError.columnsNotFound(missing)
         }
-        progress("Найдены столбцы: uid → \(uidCol), login → \(loginCol)")
+        progress("Строка заголовков: \(headerIndex + 1). uid → \(uidColumn), login → \(loginColumn)")
 
         progress("Читаю строки данных…")
         var records: [UserRecord] = []
         var skipped = 0
-        for row in rows.dropFirst() {
-            let uid = value(in: row, column: uidCol, sharedStrings)
-            let login = value(in: row, column: loginCol, sharedStrings)
+        for row in rows.dropFirst(headerIndex + 1) {
+            let uid = value(in: row, column: uidColumn, sharedStrings)
+            let login = value(in: row, column: loginColumn, sharedStrings)
             if uid.isEmpty && login.isEmpty {
                 skipped += 1
                 continue
@@ -70,6 +96,15 @@ enum XLSXReader {
 
         progress("Прочитано записей: \(records.count), пустых строк пропущено: \(skipped)")
         return records
+    }
+
+    /// Приводит заголовок к виду для сравнения: без пробелов по краям, без переносов и неразрывных пробелов, в нижнем регистре.
+    private static func normalize(_ s: String) -> String {
+        s.replacingOccurrences(of: "\u{00A0}", with: " ")
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+            .lowercased()
     }
 
     private static func text(of cell: Cell, _ sharedStrings: SharedStrings?) -> String {
