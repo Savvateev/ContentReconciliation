@@ -15,6 +15,16 @@ struct ContentView: View {
                 }
                 .keyboardShortcut("o", modifiers: .command)
 
+                Button("Получить токены") {
+                    Task { await vm.fetchTokens() }
+                }
+                .disabled(vm.records.isEmpty || vm.isFetchingTokens)
+
+                if vm.isFetchingTokens {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+
                 Spacer()
 
                 Text("Записей: \(vm.records.count)")
@@ -28,7 +38,12 @@ struct ContentView: View {
                             .frame(width: 200, alignment: .leading)
                             .textSelection(.enabled)
                         Text(record.login)
+                            .frame(width: 200, alignment: .leading)
                             .textSelection(.enabled)
+                        Text(record.token ?? "—")
+                            .textSelection(.enabled)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                     }
                 }
                 .frame(minHeight: 200)

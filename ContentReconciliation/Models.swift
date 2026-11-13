@@ -11,6 +11,7 @@ import Foundation
 struct UserRecord: Codable, Hashable {
     let uid: String
     let login: String
+    var token: String? = nil
 }
 
 enum ImportError: LocalizedError {
