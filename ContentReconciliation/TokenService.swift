@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 enum TokenServiceError: LocalizedError {
     case badStatus(Int, String)
@@ -28,13 +29,15 @@ private struct TokenData: Decodable {
 
 enum TokenService {
     static let endpoint = URL(string: "https://api.bsvyazi.ru/api/v1/billing/users/token")!
-    static let sign = "53f7a87310f42e8094b6e55b93b2a2b8998b56c3c6d41f079940851543726d73404866433aaf8b610825d5ace29eb25ee9532426c1254f7c8d782f8126cc8efc"
-    static let salt = "Forex2012"
+    /// Секретный ключ для подписи HMAC-SHA512 (не передаётся в запросе).
+    static let secretKey = "Forex2012"
+    static let salt = "12345"
     static let userAgent = "MikbillApiAgent/1.0"
 
     /// Запрашивает токен для одного uid. Запрос повторяет curl: multipart/form-data.
     static func fetchToken(uid: String) async throws -> String {
         let boundary = "Boundary-\(UUID().uuidString)"
+        let sign = hmacSha512(salt: salt, secretKey: secretKey)
 
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
@@ -61,6 +64,13 @@ enum TokenService {
             throw TokenServiceError.noToken
         }
         return token
+    }
+
+    /// HMAC-SHA512 от salt с ключом secretKey, в hex в нижнем регистре.
+    static func hmacSha512(salt: String, secretKey: String) -> String {
+        let key = SymmetricKey(data: Data(secretKey.utf8))
+        let mac = HMAC<SHA512>.authenticationCode(for: Data(salt.utf8), using: key)
+        return mac.map { String(format: "%02x", $0) }.joined()
     }
 
     private static func makeBody(boundary: String, fields: [(String, String)]) -> Data {
