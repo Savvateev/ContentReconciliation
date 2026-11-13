@@ -55,7 +55,7 @@ enum XLSXReader {
                     rowTexts.append("\(cell.reference.column.value)=«\(name)»")
                 }
                 if name == "uid"   { uid = cell.reference.column.value }
-                if name == "login" { login = cell.reference.column.value }
+                if name == "login" || name == "логин" { login = cell.reference.column.value }
             }
 
             if sampleHeaders.count < 5 && !rowTexts.isEmpty {
