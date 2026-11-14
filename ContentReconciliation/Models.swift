@@ -23,6 +23,9 @@ struct UserRecord: Codable, Hashable {
     var address: String? = nil
     var mobTel: String? = nil
     var smsTel: String? = nil
+    var activated: String? = nil
+    var blocked: String? = nil
+    var password: String? = nil
     var subscriptions: [Subscription]? = nil
 }
 

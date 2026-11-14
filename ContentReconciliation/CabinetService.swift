@@ -7,6 +7,9 @@ struct CabinetInfo {
     var address: String?
     var mobTel: String?
     var smsTel: String?
+    var activated: String?
+    var blocked: String?
+    var password: String?
     var subscriptions: [Subscription]
 }
 
@@ -40,10 +43,13 @@ private struct CabinetData: Decodable {
     let address: String?
     let mobTel: String?
     let smsTel: String?
+    let activated: String?
+    let blocked: String?
+    let password: String?
     let fee: Fee?
 
     enum CodingKeys: String, CodingKey {
-        case user, fio, phone, address, fee
+        case user, fio, phone, address, fee, activated, blocked, password
         case mobTel = "mob_tel"
         case smsTel = "sms_tel"
     }
@@ -96,6 +102,9 @@ enum CabinetService {
             address: info.address,
             mobTel: info.mobTel,
             smsTel: info.smsTel,
+            activated: info.activated,
+            blocked: info.blocked,
+            password: info.password,
             subscriptions: info.fee?.subscriptions?.detailed ?? []
         )
     }

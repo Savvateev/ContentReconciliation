@@ -152,6 +152,9 @@ final class ImportViewModel: ObservableObject {
                 records[index].address = info.address
                 records[index].mobTel = info.mobTel
                 records[index].smsTel = info.smsTel
+                records[index].activated = info.activated
+                records[index].blocked = info.blocked
+                records[index].password = info.password
                 records[index].subscriptions = info.subscriptions
                 ok += 1
                 log("uid \(uid): данные получены, подписок: \(info.subscriptions.count)")
