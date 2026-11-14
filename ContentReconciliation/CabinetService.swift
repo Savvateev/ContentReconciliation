@@ -101,19 +101,15 @@ enum CabinetService {
     }
 }
 
-/// Текст для export.txt: ответ cabinet/user с именами всех полей.
+/// Текст для export.txt: ответ cabinet/user с именами всех полей, значения без изменений.
 enum UserInfoExport {
-    /// Поля, значения которых не выводятся в файл.
-    static let secretKeys: Set<String> = ["password", "router_pass", "router_wep_pass", "rentsoft_secret"]
-
     static func makeText(uid: String, login: String, raw: Data) throws -> String {
         guard let root = try JSONSerialization.jsonObject(with: raw) as? [String: Any] else {
             throw CabinetServiceError.badResponse(String(data: raw, encoding: .utf8) ?? "")
         }
 
-        let masked = mask(root)
         let pretty = try JSONSerialization.data(
-            withJSONObject: masked,
+            withJSONObject: root,
             options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         )
         let json = String(data: pretty, encoding: .utf8) ?? ""
@@ -122,24 +118,9 @@ enum UserInfoExport {
         Экспорт user info
         Запись: uid \(uid), login \(login)
         Поля в ответе api/v1/cabinet/user. Имена полей — ключи JSON.
-        Значения secretKeys заменены на ***: \(secretKeys.sorted().joined(separator: ", "))
 
         \(json)
 
         """
-    }
-
-    private static func mask(_ value: Any) -> Any {
-        if let dict = value as? [String: Any] {
-            var out: [String: Any] = [:]
-            for (key, item) in dict {
-                out[key] = secretKeys.contains(key) ? "***" : mask(item)
-            }
-            return out
-        }
-        if let array = value as? [Any] {
-            return array.map { mask($0) }
-        }
-        return value
     }
 }
