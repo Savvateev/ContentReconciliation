@@ -8,10 +8,22 @@
 
 import Foundation
 
+struct Subscription: Codable, Hashable {
+    let name: String
+    let price: Double
+}
+
 struct UserRecord: Codable, Hashable {
     let uid: String
     let login: String
     var token: String? = nil
+    var user: String? = nil
+    var fio: String? = nil
+    var phone: String? = nil
+    var address: String? = nil
+    var mobTel: String? = nil
+    var smsTel: String? = nil
+    var subscriptions: [Subscription]? = nil
 }
 
 enum ImportError: LocalizedError {

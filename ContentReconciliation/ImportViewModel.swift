@@ -16,6 +16,7 @@ final class ImportViewModel: ObservableObject {
     @Published var logs: [String] = []
     @Published var showImporter = false
     @Published var isFetchingTokens = false
+    @Published var isFetchingData = false
 
     init() {
         log("Запуск приложения")
@@ -86,6 +87,55 @@ final class ImportViewModel: ObservableObject {
         do {
             try DataStore.save(records)
             log("Токены сохранены в файл данных. Успешно: \(ok), с ошибкой: \(failed)")
+        } catch {
+            log("Ошибка сохранения файла данных: \(error.localizedDescription)")
+        }
+    }
+
+    /// Получает данные пользователя по токену для каждой записи и сохраняет их в файл данных.
+    /// Персональные данные в журнал не пишутся.
+    func fetchData() async {
+        guard !records.isEmpty else {
+            log("Нет записей: сначала выполните импорт")
+            return
+        }
+
+        let indices = records.indices.filter { records[$0].token != nil }
+        guard !indices.isEmpty else {
+            log("Нет токенов: сначала нажмите «Получить токены»")
+            return
+        }
+
+        isFetchingData = true
+        defer { isFetchingData = false }
+
+        log("Получаю данные для \(indices.count) пользователей…")
+        var ok = 0
+        var failed = 0
+
+        for index in indices {
+            let uid = records[index].uid
+            guard let token = records[index].token else { continue }
+            do {
+                let info = try await CabinetService.fetchUser(token: token)
+                records[index].user = info.user
+                records[index].fio = info.fio
+                records[index].phone = info.phone
+                records[index].address = info.address
+                records[index].mobTel = info.mobTel
+                records[index].smsTel = info.smsTel
+                records[index].subscriptions = info.subscriptions
+                ok += 1
+                log("uid \(uid): данные получены, подписок: \(info.subscriptions.count)")
+            } catch {
+                failed += 1
+                log("uid \(uid): ошибка, \(error.localizedDescription)")
+            }
+        }
+
+        do {
+            try DataStore.save(records)
+            log("Данные сохранены в файл данных. Успешно: \(ok), с ошибкой: \(failed)")
         } catch {
             log("Ошибка сохранения файла данных: \(error.localizedDescription)")
         }

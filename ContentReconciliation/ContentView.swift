@@ -6,6 +6,8 @@ struct ContentView: View {
 
     private let xlsxType = UTType(filenameExtension: "xlsx") ?? .data
 
+    private var isBusy: Bool { vm.isFetchingTokens || vm.isFetchingData }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
 
@@ -14,13 +16,19 @@ struct ContentView: View {
                     vm.showImporter = true
                 }
                 .keyboardShortcut("o", modifiers: .command)
+                .disabled(isBusy)
 
                 Button("Получить токены") {
                     Task { await vm.fetchTokens() }
                 }
-                .disabled(vm.records.isEmpty || vm.isFetchingTokens)
+                .disabled(vm.records.isEmpty || isBusy)
 
-                if vm.isFetchingTokens {
+                Button("Получить данные") {
+                    Task { await vm.fetchData() }
+                }
+                .disabled(vm.records.isEmpty || isBusy)
+
+                if isBusy {
                     ProgressView()
                         .controlSize(.small)
                 }
@@ -31,20 +39,9 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
 
-            GroupBox("Данные (uid / login)") {
+            GroupBox("Данные") {
                 List(Array(vm.records.enumerated()), id: \.offset) { _, record in
-                    HStack {
-                        Text(record.uid)
-                            .frame(width: 200, alignment: .leading)
-                            .textSelection(.enabled)
-                        Text(record.login)
-                            .frame(width: 200, alignment: .leading)
-                            .textSelection(.enabled)
-                        Text(record.token ?? "—")
-                            .textSelection(.enabled)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
+                    RecordRow(record: record)
                 }
                 .frame(minHeight: 200)
             }
@@ -87,5 +84,38 @@ struct ContentView: View {
                 vm.log("Выбор файла отменён или с ошибкой: \(error.localizedDescription)")
             }
         }
+    }
+}
+
+private struct RecordRow: View {
+    let record: UserRecord
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("uid \(record.uid) · login \(record.login)")
+
+            let contacts = [record.fio, record.phone, record.mobTel, record.smsTel]
+                .compactMap { $0 }
+                .filter { !$0.isEmpty }
+            if !contacts.isEmpty {
+                Text(contacts.joined(separator: " · "))
+                    .foregroundStyle(.secondary)
+            }
+
+            if let address = record.address, !address.isEmpty {
+                Text(address)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let subs = record.subscriptions, !subs.isEmpty {
+                Text("Подписки: " + subs.map { "\($0.name) — \(String(format: "%.2f", $0.price))" }.joined(separator: "; "))
+            }
+
+            Text("Токен: " + (record.token.map { String($0.prefix(24)) + "…" } ?? "нет"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .font(.callout)
+        .textSelection(.enabled)
     }
 }
