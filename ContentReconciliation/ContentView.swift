@@ -28,6 +28,11 @@ struct ContentView: View {
                 }
                 .disabled(vm.records.isEmpty || isBusy)
 
+                Button("Экспорт export.txt") {
+                    Task { await vm.exportUserInfo() }
+                }
+                .disabled(vm.records.allSatisfy { $0.token == nil } || isBusy)
+
                 if isBusy {
                     ProgressView()
                         .controlSize(.small)

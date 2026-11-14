@@ -92,6 +92,34 @@ final class ImportViewModel: ObservableObject {
         }
     }
 
+    /// Запрашивает cabinet/user для первой записи с токеном и пишет ответ с именами полей в Downloads/export.txt.
+    func exportUserInfo() async {
+        guard let record = records.first(where: { $0.token != nil }),
+              let token = record.token else {
+            log("Нет токена: сначала нажмите «Получить токены»")
+            return
+        }
+
+        isFetchingData = true
+        defer { isFetchingData = false }
+
+        log("Экспорт: запрашиваю данные uid \(record.uid)…")
+        do {
+            let raw = try await CabinetService.fetchRaw(token: token)
+            let text = try UserInfoExport.makeText(uid: record.uid, login: record.login, raw: raw)
+
+            guard let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else {
+                log("Ошибка экспорта: папка «Загрузки» не найдена")
+                return
+            }
+            let fileURL = downloads.appendingPathComponent("export.txt")
+            try text.write(to: fileURL, atomically: true, encoding: .utf8)
+            log("Экспорт сохранён: \(fileURL.path)")
+        } catch {
+            log("Ошибка экспорта: \(error.localizedDescription)")
+        }
+    }
+
     /// Получает данные пользователя по токену для каждой записи и сохраняет их в файл данных.
     /// Персональные данные в журнал не пишутся.
     func fetchData() async {

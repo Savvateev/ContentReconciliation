@@ -60,23 +60,29 @@ private struct Subscriptions: Decodable {
 enum CabinetService {
     static let endpoint = URL(string: "https://api.bsvyazi.ru/api/v1/cabinet/user")!
 
-    /// Получает данные пользователя по токену. Токен передаётся в заголовке Authorization как есть.
-    static func fetchUser(token: String) async throws -> CabinetInfo {
+    /// Запрос cabinet/user. Возвращает тело ответа как есть.
+    static func fetchRaw(token: String) async throws -> Data {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "GET"
         request.setValue(TokenService.userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue(token, forHTTPHeaderField: "Authorization")
 
         let (data, response) = try await URLSession.shared.data(for: request)
-        let body = String(data: data, encoding: .utf8) ?? ""
         let code = (response as? HTTPURLResponse)?.statusCode ?? -1
 
         guard (200..<300).contains(code) else {
+            let body = String(data: data, encoding: .utf8) ?? ""
             throw CabinetServiceError.badStatus(code, body)
         }
+        return data
+    }
+
+    /// Получает данные пользователя по токену и разбирает нужные поля.
+    static func fetchUser(token: String) async throws -> CabinetInfo {
+        let data = try await fetchRaw(token: token)
 
         guard let json = try? JSONDecoder().decode(CabinetResponse.self, from: data) else {
-            throw CabinetServiceError.badResponse(body)
+            throw CabinetServiceError.badResponse(String(data: data, encoding: .utf8) ?? "")
         }
 
         guard json.success, let info = json.data else {
@@ -92,5 +98,48 @@ enum CabinetService {
             smsTel: info.smsTel,
             subscriptions: info.fee?.subscriptions?.detailed ?? []
         )
+    }
+}
+
+/// Текст для export.txt: ответ cabinet/user с именами всех полей.
+enum UserInfoExport {
+    /// Поля, значения которых не выводятся в файл.
+    static let secretKeys: Set<String> = ["password", "router_pass", "router_wep_pass", "rentsoft_secret"]
+
+    static func makeText(uid: String, login: String, raw: Data) throws -> String {
+        guard let root = try JSONSerialization.jsonObject(with: raw) as? [String: Any] else {
+            throw CabinetServiceError.badResponse(String(data: raw, encoding: .utf8) ?? "")
+        }
+
+        let masked = mask(root)
+        let pretty = try JSONSerialization.data(
+            withJSONObject: masked,
+            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        )
+        let json = String(data: pretty, encoding: .utf8) ?? ""
+
+        return """
+        Экспорт user info
+        Запись: uid \(uid), login \(login)
+        Поля в ответе api/v1/cabinet/user. Имена полей — ключи JSON.
+        Значения secretKeys заменены на ***: \(secretKeys.sorted().joined(separator: ", "))
+
+        \(json)
+
+        """
+    }
+
+    private static func mask(_ value: Any) -> Any {
+        if let dict = value as? [String: Any] {
+            var out: [String: Any] = [:]
+            for (key, item) in dict {
+                out[key] = secretKeys.contains(key) ? "***" : mask(item)
+            }
+            return out
+        }
+        if let array = value as? [Any] {
+            return array.map { mask($0) }
+        }
+        return value
     }
 }
