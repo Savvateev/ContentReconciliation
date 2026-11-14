@@ -8,15 +8,29 @@
 
 import Foundation
 
+struct Subscription: Codable, Hashable {
+    let name: String
+    let price: Double
+}
+
 struct UserRecord: Codable, Hashable {
     let uid: String
     let login: String
+    var token: String? = nil
+    var user: String? = nil
+    var fio: String? = nil
+    var phone: String? = nil
+    var address: String? = nil
+    var mobTel: String? = nil
+    var smsTel: String? = nil
+    var subscriptions: [Subscription]? = nil
 }
 
 enum ImportError: LocalizedError {
     case cannotOpen(String)
     case noSheets
     case emptySheet
+    case sheetNotFound(String)
     case columnsNotFound([String])
 
     var errorDescription: String? {
@@ -27,6 +41,8 @@ enum ImportError: LocalizedError {
             return "В файле нет листов"
         case .emptySheet:
             return "Первый лист пуст"
+        case .sheetNotFound(let name):
+            return "В файле нет листа «\(name)»"
         case .columnsNotFound(let names):
             return "Не найдены столбцы: \(names.joined(separator: ", "))"
         }
