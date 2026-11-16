@@ -107,7 +107,7 @@ final class ImportViewModel: ObservableObject {
         }
 
         let rows = AnalysisReport.build(records)
-        let csv = AnalysisReport.csv(rows)
+        let csv = AnalysisReport.csv(rows, records: records)
 
         guard let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else {
             log("Ошибка анализа: папка «Загрузки» не найдена")

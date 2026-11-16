@@ -1,5 +1,21 @@
 import Foundation
 
+/// Оператор подписки. Определяется по названию подписки.
+enum Operator: String, CaseIterable {
+    case tv24 = "24TV"
+    case moovi = "Moovi"
+    case smotreshka = "Smotreshka"
+
+    /// 24TV — если в названии есть «24TV»; Moovi — «moovi» или «муки»;
+    /// всё остальное — Smotreshka.
+    static func of(subscriptionName name: String) -> Operator {
+        let lower = name.lowercased()
+        if lower.contains("24tv") { return .tv24 }
+        if lower.contains("moovi") || lower.contains("муки") { return .moovi }
+        return .smotreshka
+    }
+}
+
 /// Одна строка отчёта: данные по одному населённому пункту.
 struct SettlementReport: Identifiable, Hashable {
     var id: String { settlement }
@@ -10,6 +26,9 @@ struct SettlementReport: Identifiable, Hashable {
     let unblocked: Int
     /// Записи с непустым списком подписок.
     let subscribers: Int
+    /// Записи, у которых есть подписка данного оператора.
+    /// У одного абонента может быть несколько операторов — он учитывается в каждом.
+    let byOperator: [Operator: Int]
 
     /// Процент абонентов с подпиской от количества не заблокированных.
     var percent: Double {
@@ -28,26 +47,9 @@ enum AnalysisReport {
         return part.isEmpty ? "не указан" : part
     }
 
-    /// CSV с разделителем «;» (Excel в русской локали открывает его сразу по столбцам).
-    /// Процент с двумя знаками после точки. Поля в кавычках, если содержат «;», кавычки или перенос строки.
-    static func csv(_ rows: [SettlementReport]) -> String {
-        var lines = ["Населенный пункт;Количество;Не заблокированы;С подпиской;Процент с подпиской"]
-        for row in rows {
-            lines.append([
-                escape(row.settlement),
-                "\(row.total)",
-                "\(row.unblocked)",
-                "\(row.subscribers)",
-                String(format: "%.2f", row.percent)
-            ].joined(separator: ";"))
-        }
-        return lines.joined(separator: "\r\n") + "\r\n"
-    }
-
-    private static func escape(_ field: String) -> String {
-        let needsQuotes = field.contains(";") || field.contains("\"") || field.contains("\n") || field.contains("\r")
-        guard needsQuotes else { return field }
-        return "\"" + field.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+    /// Операторы, у которых есть хотя бы одна подписка у записи.
+    static func operators(of record: UserRecord) -> Set<Operator> {
+        Set((record.subscriptions ?? []).map { Operator.of(subscriptionName: $0.name) })
     }
 
     /// Группирует записи по населённому пункту и считает показатели.
@@ -56,13 +58,63 @@ enum AnalysisReport {
 
         return groups
             .map { name, items in
-                SettlementReport(
+                var byOperator: [Operator: Int] = [:]
+                for op in Operator.allCases {
+                    byOperator[op] = items.filter { operators(of: $0).contains(op) }.count
+                }
+                return SettlementReport(
                     settlement: name,
                     total: items.count,
                     unblocked: items.filter { $0.blocked != "1" }.count,
-                    subscribers: items.filter { !($0.subscriptions ?? []).isEmpty }.count
+                    subscribers: items.filter { !($0.subscriptions ?? []).isEmpty }.count,
+                    byOperator: byOperator
                 )
             }
             .sorted { $0.settlement.localizedStandardCompare($1.settlement) == .orderedAscending }
+    }
+
+    /// CSV с разделителем «;». Последняя строка «Итого».
+    /// «Итого» по абонентам считается по записям, а не сложением строк:
+    /// у одного абонента может быть несколько операторов.
+    static func csv(_ rows: [SettlementReport], records: [UserRecord]) -> String {
+        var header = ["Населенный пункт", "Количество", "Не заблокированы", "С подпиской"]
+        header += Operator.allCases.map { $0.rawValue }
+        header += ["Процент с подпиской"]
+
+        var lines = [header.joined(separator: ";")]
+
+        for row in rows {
+            var cells = [
+                escape(row.settlement),
+                "\(row.total)",
+                "\(row.unblocked)",
+                "\(row.subscribers)"
+            ]
+            cells += Operator.allCases.map { "\(row.byOperator[$0] ?? 0)" }
+            cells += [String(format: "%.2f", row.percent)]
+            lines.append(cells.joined(separator: ";"))
+        }
+
+        // Итого: по всем записям, без двойного счёта
+        let total = rows.reduce(0) { $0 + $1.total }
+        let unblocked = rows.reduce(0) { $0 + $1.unblocked }
+        let subscribers = rows.reduce(0) { $0 + $1.subscribers }
+        let totalByOperator: [Operator: Int] = Dictionary(uniqueKeysWithValues: Operator.allCases.map { op in
+            (op, records.filter { operators(of: $0).contains(op) }.count)
+        })
+        let percent = unblocked == 0 ? 0 : Double(subscribers) / Double(unblocked) * 100
+
+        var totalCells = ["Итого", "\(total)", "\(unblocked)", "\(subscribers)"]
+        totalCells += Operator.allCases.map { "\(totalByOperator[$0] ?? 0)" }
+        totalCells += [String(format: "%.2f", percent)]
+        lines.append(totalCells.joined(separator: ";"))
+
+        return lines.joined(separator: "\r\n") + "\r\n"
+    }
+
+    private static func escape(_ field: String) -> String {
+        let needsQuotes = field.contains(";") || field.contains("\"") || field.contains("\n") || field.contains("\r")
+        guard needsQuotes else { return field }
+        return "\"" + field.replacingOccurrences(of: "\"", with: "\"\"") + "\""
     }
 }
