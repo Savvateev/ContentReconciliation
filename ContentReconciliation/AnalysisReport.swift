@@ -28,6 +28,28 @@ enum AnalysisReport {
         return part.isEmpty ? "не указан" : part
     }
 
+    /// CSV с разделителем «;» (Excel в русской локали открывает его сразу по столбцам).
+    /// Процент с двумя знаками после точки. Поля в кавычках, если содержат «;», кавычки или перенос строки.
+    static func csv(_ rows: [SettlementReport]) -> String {
+        var lines = ["Населенный пункт;Количество;Не заблокированы;С подпиской;Процент с подпиской"]
+        for row in rows {
+            lines.append([
+                escape(row.settlement),
+                "\(row.total)",
+                "\(row.unblocked)",
+                "\(row.subscribers)",
+                String(format: "%.2f", row.percent)
+            ].joined(separator: ";"))
+        }
+        return lines.joined(separator: "\r\n") + "\r\n"
+    }
+
+    private static func escape(_ field: String) -> String {
+        let needsQuotes = field.contains(";") || field.contains("\"") || field.contains("\n") || field.contains("\r")
+        guard needsQuotes else { return field }
+        return "\"" + field.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+    }
+
     /// Группирует записи по населённому пункту и считает показатели.
     static func build(_ records: [UserRecord]) -> [SettlementReport] {
         let groups = Dictionary(grouping: records) { settlement(from: $0.address) }

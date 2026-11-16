@@ -17,7 +17,6 @@ final class ImportViewModel: ObservableObject {
     @Published var showImporter = false
     @Published var isFetchingTokens = false
     @Published var isFetchingData = false
-    @Published var report: [SettlementReport] = []
 
     init() {
         log("Запуск приложения")
@@ -93,7 +92,8 @@ final class ImportViewModel: ObservableObject {
         }
     }
 
-    /// Строит отчёт по населённым пунктам по данным, уже полученным из cabinet/user.
+    /// Строит отчёт по населённым пунктам и сохраняет его в Загрузки/analiz.csv.
+    /// На экран отчёт не выводится; в журнале пишутся только шаги и итоги.
     func analyze() {
         guard !records.isEmpty else {
             log("Нет записей: сначала выполните импорт")
@@ -106,8 +106,24 @@ final class ImportViewModel: ObservableObject {
             log("Внимание: у \(records.count - withData) записей нет данных, нажмите «Получить данные»")
         }
 
-        report = AnalysisReport.build(records)
-        log("Отчёт сформирован: населённых пунктов \(report.count)")
+        let rows = AnalysisReport.build(records)
+        let csv = AnalysisReport.csv(rows)
+
+        guard let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else {
+            log("Ошибка анализа: папка «Загрузки» не найдена")
+            return
+        }
+        let fileURL = downloads.appendingPathComponent("analiz.csv")
+
+        do {
+            // BOM в начале файла: Excel читает кириллицу в UTF-8 без искажений
+            var data = Data([0xEF, 0xBB, 0xBF])
+            data.append(Data(csv.utf8))
+            try data.write(to: fileURL, options: .atomic)
+            log("Отчёт сохранён: \(fileURL.path). Населённых пунктов: \(rows.count)")
+        } catch {
+            log("Ошибка сохранения отчёта: \(error.localizedDescription)")
+        }
     }
 
     /// Запрашивает cabinet/user для первой записи с токеном и пишет ответ с именами полей в Downloads/export.txt.

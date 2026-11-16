@@ -56,27 +56,6 @@ struct ContentView: View {
                 .frame(minHeight: 200)
             }
 
-            GroupBox("Отчёт по населённым пунктам") {
-                Table(vm.report) {
-                    TableColumn("Населённый пункт") { row in
-                        Text(row.settlement)
-                    }
-                    TableColumn("Записей") { row in
-                        Text("\(row.total)")
-                    }
-                    TableColumn("Не заблокированы") { row in
-                        Text("\(row.unblocked)")
-                    }
-                    TableColumn("С подпиской") { row in
-                        Text("\(row.subscribers)")
-                    }
-                    TableColumn("Процент с подпиской") { row in
-                        Text(String(format: "%.1f %%", row.percent))
-                    }
-                }
-                .frame(minHeight: 160)
-            }
-
             GroupBox("Журнал") {
                 ScrollViewReader { proxy in
                     ScrollView {
