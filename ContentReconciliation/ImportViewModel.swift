@@ -46,11 +46,40 @@ final class ImportViewModel: ObservableObject {
                 self.log(message)
             }
 
-            log("Сохраняю \(imported.count) записей в файл данных…")
-            let all = records + imported
-            try DataStore.save(all)
-            records = all
-            log("Готово. Всего записей в файле данных: \(all.count)")
+            log("Проверяю уникальность uid и сохраняю записи…")
+            var added = 0
+            var updated = 0
+            var skippedDuplicates = 0
+            var seenInFile = Set<String>()
+            var merged = records
+            // Индекс по uid. Если в data.json уже есть дубли, не падаем: берём первую запись
+            var indexByUID: [String: Int] = [:]
+            for (index, record) in merged.enumerated() where indexByUID[record.uid] == nil {
+                indexByUID[record.uid] = index
+            }
+
+            for item in imported {
+                // Повтор uid внутри самого файла: берём первую строку
+                if !seenInFile.insert(item.uid).inserted {
+                    skippedDuplicates += 1
+                    continue
+                }
+                if let index = indexByUID[item.uid] {
+                    // Существующая запись: обновляем данные из файла, поля из API не трогаем
+                    merged[index].login = item.login
+                    merged[index].status = item.status
+                    updated += 1
+                } else {
+                    indexByUID[item.uid] = merged.count
+                    merged.append(item)
+                    added += 1
+                }
+            }
+
+            try DataStore.save(merged)
+            records = merged
+            log("Добавлено: \(added), обновлено: \(updated), повторов uid в файле пропущено: \(skippedDuplicates)")
+            log("Готово. Всего записей в файле данных: \(merged.count)")
         } catch {
             log("Ошибка импорта: \(error.localizedDescription)")
         }

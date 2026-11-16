@@ -15,7 +15,7 @@ struct Subscription: Codable, Hashable {
 
 struct UserRecord: Codable, Hashable {
     let uid: String
-    let login: String
+    var login: String
     var status: String? = nil
     var token: String? = nil
     var user: String? = nil
