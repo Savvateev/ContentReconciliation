@@ -41,11 +41,13 @@ enum XLSXReader {
         var headerIndex: Int?
         var uidCol: String?
         var loginCol: String?
+        var statusCol: String?
         var sampleHeaders: [String] = []
 
         for (index, row) in rows.prefix(maxHeaderSearchRows).enumerated() {
             var uid: String?
             var login: String?
+            var status: String?
             var rowTexts: [String] = []
 
             for cell in row.cells {
@@ -56,6 +58,7 @@ enum XLSXReader {
                 }
                 if name == "uid"   { uid = cell.reference.column.value }
                 if name == "login" || name == "логин" { login = cell.reference.column.value }
+                if name == "статус" { status = cell.reference.column.value }
             }
 
             if sampleHeaders.count < 5 && !rowTexts.isEmpty {
@@ -66,6 +69,7 @@ enum XLSXReader {
                 headerIndex = index
                 uidCol = uid
                 loginCol = login
+                statusCol = status
                 break
             }
         }
@@ -79,7 +83,7 @@ enum XLSXReader {
             if loginCol == nil { missing.append("login") }
             throw ImportError.columnsNotFound(missing)
         }
-        progress("Строка заголовков: \(headerIndex + 1). uid → \(uidColumn), login → \(loginColumn)")
+        progress("Строка заголовков: \(headerIndex + 1). uid → \(uidColumn), login → \(loginColumn), статус → \(statusCol ?? "нет")")
 
         progress("Читаю строки данных…")
         var records: [UserRecord] = []
@@ -87,11 +91,12 @@ enum XLSXReader {
         for row in rows.dropFirst(headerIndex + 1) {
             let uid = value(in: row, column: uidColumn, sharedStrings)
             let login = value(in: row, column: loginColumn, sharedStrings)
+            let status = statusCol.map { value(in: row, column: $0, sharedStrings) }
             if uid.isEmpty && login.isEmpty {
                 skipped += 1
                 continue
             }
-            records.append(UserRecord(uid: uid, login: login))
+            records.append(UserRecord(uid: uid, login: login, status: status?.isEmpty == false ? status : nil))
         }
 
         progress("Прочитано записей: \(records.count), пустых строк пропущено: \(skipped)")
