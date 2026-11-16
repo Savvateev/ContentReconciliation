@@ -22,7 +22,7 @@ struct SettlementReport: Identifiable, Hashable {
     let settlement: String
     /// Все записи в населённом пункте.
     let total: Int
-    /// Записи, где blocked не равно "1".
+    /// Записи, у которых статус не «удален».
     let unblocked: Int
     /// Записи с непустым списком подписок.
     let subscribers: Int
@@ -52,6 +52,17 @@ enum AnalysisReport {
         Set((record.subscriptions ?? []).map { Operator.of(subscriptionName: $0.name) })
     }
 
+    /// Абонент учитывается, если статус не «удален».
+    /// Сравнение без учёта регистра, пробелы по краям убираются, «ё» приравнивается к «е».
+    static func isActive(_ record: UserRecord) -> Bool {
+        guard let status = record.status else { return true }
+        let normalized = status
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "ё", with: "е")
+        return normalized != "удален"
+    }
+
     /// Группирует записи по населённому пункту и считает показатели.
     static func build(_ records: [UserRecord]) -> [SettlementReport] {
         let groups = Dictionary(grouping: records) { settlement(from: $0.address) }
@@ -65,7 +76,7 @@ enum AnalysisReport {
                 return SettlementReport(
                     settlement: name,
                     total: items.count,
-                    unblocked: items.filter { $0.blocked != "1" }.count,
+                    unblocked: items.filter { isActive($0) }.count,
                     subscribers: items.filter { !($0.subscriptions ?? []).isEmpty }.count,
                     byOperator: byOperator
                 )
@@ -77,7 +88,7 @@ enum AnalysisReport {
     /// «Итого» по абонентам считается по записям, а не сложением строк:
     /// у одного абонента может быть несколько операторов.
     static func csv(_ rows: [SettlementReport], records: [UserRecord]) -> String {
-        var header = ["Населенный пункт", "Количество", "Не заблокированы", "С подпиской"]
+        var header = ["Населенный пункт", "Количество", "Не удаленные", "С подпиской"]
         header += Operator.allCases.map { $0.rawValue }
         header += Operator.allCases.map { "% \($0.rawValue)" }
         header += ["Процент с подпиской"]
