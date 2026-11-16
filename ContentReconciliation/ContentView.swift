@@ -28,10 +28,15 @@ struct ContentView: View {
                 }
                 .disabled(vm.records.isEmpty || isBusy)
 
-                Button("Экспорт export.txt") {
+                Button("Экспорт user info") {
                     Task { await vm.exportUserInfo() }
                 }
                 .disabled(vm.records.allSatisfy { $0.token == nil } || isBusy)
+
+                Button("Анализ") {
+                    vm.analyze()
+                }
+                .disabled(vm.records.isEmpty || isBusy)
 
                 if isBusy {
                     ProgressView()
@@ -49,6 +54,27 @@ struct ContentView: View {
                     RecordRow(record: record)
                 }
                 .frame(minHeight: 200)
+            }
+
+            GroupBox("Отчёт по населённым пунктам") {
+                Table(vm.report) {
+                    TableColumn("Населённый пункт") { row in
+                        Text(row.settlement)
+                    }
+                    TableColumn("Записей") { row in
+                        Text("\(row.total)")
+                    }
+                    TableColumn("Не заблокированы") { row in
+                        Text("\(row.unblocked)")
+                    }
+                    TableColumn("С подпиской") { row in
+                        Text("\(row.subscribers)")
+                    }
+                    TableColumn("Процент с подпиской") { row in
+                        Text(String(format: "%.1f %%", row.percent))
+                    }
+                }
+                .frame(minHeight: 160)
             }
 
             GroupBox("Журнал") {

@@ -17,6 +17,7 @@ final class ImportViewModel: ObservableObject {
     @Published var showImporter = false
     @Published var isFetchingTokens = false
     @Published var isFetchingData = false
+    @Published var report: [SettlementReport] = []
 
     init() {
         log("Запуск приложения")
@@ -90,6 +91,23 @@ final class ImportViewModel: ObservableObject {
         } catch {
             log("Ошибка сохранения файла данных: \(error.localizedDescription)")
         }
+    }
+
+    /// Строит отчёт по населённым пунктам по данным, уже полученным из cabinet/user.
+    func analyze() {
+        guard !records.isEmpty else {
+            log("Нет записей: сначала выполните импорт")
+            return
+        }
+
+        let withData = records.filter { $0.address != nil || $0.subscriptions != nil }.count
+        log("Анализ: записей \(records.count), с данными из cabinet/user: \(withData)")
+        if withData < records.count {
+            log("Внимание: у \(records.count - withData) записей нет данных, нажмите «Получить данные»")
+        }
+
+        report = AnalysisReport.build(records)
+        log("Отчёт сформирован: населённых пунктов \(report.count)")
     }
 
     /// Запрашивает cabinet/user для первой записи с токеном и пишет ответ с именами полей в Downloads/export.txt.
