@@ -79,6 +79,7 @@ enum AnalysisReport {
     static func csv(_ rows: [SettlementReport], records: [UserRecord]) -> String {
         var header = ["Населенный пункт", "Количество", "Не заблокированы", "С подпиской"]
         header += Operator.allCases.map { $0.rawValue }
+        header += Operator.allCases.map { "% \($0.rawValue)" }
         header += ["Процент с подпиской"]
 
         var lines = [header.joined(separator: ";")]
@@ -91,6 +92,7 @@ enum AnalysisReport {
                 "\(row.subscribers)"
             ]
             cells += Operator.allCases.map { "\(row.byOperator[$0] ?? 0)" }
+            cells += Operator.allCases.map { percent(row.byOperator[$0] ?? 0, of: row.unblocked) }
             cells += [String(format: "%.2f", row.percent)]
             lines.append(cells.joined(separator: ";"))
         }
@@ -106,10 +108,16 @@ enum AnalysisReport {
 
         var totalCells = ["Итого", "\(total)", "\(unblocked)", "\(subscribers)"]
         totalCells += Operator.allCases.map { "\(totalByOperator[$0] ?? 0)" }
+        totalCells += Operator.allCases.map { percent(totalByOperator[$0] ?? 0, of: unblocked) }
         totalCells += [String(format: "%.2f", percent)]
         lines.append(totalCells.joined(separator: ";"))
 
         return lines.joined(separator: "\r\n") + "\r\n"
+    }
+
+    /// Процент части от целого с двумя знаками; при нуле в знаменателе — 0.00.
+    private static func percent(_ part: Int, of whole: Int) -> String {
+        whole == 0 ? "0.00" : String(format: "%.2f", Double(part) / Double(whole) * 100)
     }
 
     private static func escape(_ field: String) -> String {
