@@ -104,12 +104,12 @@ enum AnalysisReport {
         let totalByOperator: [Operator: Int] = Dictionary(uniqueKeysWithValues: Operator.allCases.map { op in
             (op, records.filter { operators(of: $0).contains(op) }.count)
         })
-        let percent = unblocked == 0 ? 0 : Double(subscribers) / Double(unblocked) * 100
+        let totalPercent = unblocked == 0 ? 0 : Double(subscribers) / Double(unblocked) * 100
 
         var totalCells = ["Итого", "\(total)", "\(unblocked)", "\(subscribers)"]
         totalCells += Operator.allCases.map { "\(totalByOperator[$0] ?? 0)" }
         totalCells += Operator.allCases.map { percent(totalByOperator[$0] ?? 0, of: unblocked) }
-        totalCells += [String(format: "%.2f", percent)]
+        totalCells += [String(format: "%.2f", totalPercent)]
         lines.append(totalCells.joined(separator: ";"))
 
         return lines.joined(separator: "\r\n") + "\r\n"
