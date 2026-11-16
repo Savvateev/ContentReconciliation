@@ -24,9 +24,58 @@ final class ImportViewModel: ObservableObject {
             records = try DataStore.load()
             log("Загружен файл данных: \(records.count) записей")
             log("Путь к файлу данных: \(DataStore.fileURL.path)")
+            removeDuplicateUIDs()
         } catch {
             log("Ошибка чтения файла данных: \(error.localizedDescription)")
         }
+    }
+
+    /// Оставляет одну запись на каждый uid: первую. Пустые поля первой записи
+    /// заполняются значениями из дубликатов, чтобы не потерять токен или подписки.
+    /// Файл перезаписывается только если дубли были.
+    private func removeDuplicateUIDs() {
+        var result: [UserRecord] = []
+        var indexByUID: [String: Int] = [:]
+        var removed = 0
+
+        for record in records {
+            guard let index = indexByUID[record.uid] else {
+                indexByUID[record.uid] = result.count
+                result.append(record)
+                continue
+            }
+            removed += 1
+            result[index] = Self.merge(keep: result[index], extra: record)
+        }
+
+        guard removed > 0 else { return }
+
+        do {
+            try DataStore.save(result)
+            records = result
+            log("Очистка uid: удалено дублей \(removed), осталось записей \(result.count)")
+        } catch {
+            log("Ошибка сохранения после очистки дублей: \(error.localizedDescription)")
+        }
+    }
+
+    /// Берёт поля из keep; если поле пустое, берёт его из extra.
+    private static func merge(keep: UserRecord, extra: UserRecord) -> UserRecord {
+        var out = keep
+        if out.login.isEmpty { out.login = extra.login }
+        if out.status == nil { out.status = extra.status }
+        if out.token == nil { out.token = extra.token }
+        if out.user == nil { out.user = extra.user }
+        if out.fio == nil { out.fio = extra.fio }
+        if out.phone == nil { out.phone = extra.phone }
+        if out.address == nil { out.address = extra.address }
+        if out.mobTel == nil { out.mobTel = extra.mobTel }
+        if out.smsTel == nil { out.smsTel = extra.smsTel }
+        if out.activated == nil { out.activated = extra.activated }
+        if out.blocked == nil { out.blocked = extra.blocked }
+        if out.password == nil { out.password = extra.password }
+        if out.subscriptions == nil { out.subscriptions = extra.subscriptions }
+        return out
     }
 
     func log(_ message: String) {
