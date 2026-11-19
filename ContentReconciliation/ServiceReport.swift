@@ -11,9 +11,13 @@ enum ServiceReport {
         let withSubscriptions: Int
         /// Заявки, созданные в квартале.
         let requests: Int
+        /// Заявки квартала, в типе которых есть «Проблемы с ТВ».
+        let tvProblems: Int
 
         var subscriptionPercent: Double { percent(withSubscriptions, of: subscribers) }
         var requestPercent: Double { percent(requests, of: subscribers) }
+        /// Проблемы с ТВ от абонентов с подпиской.
+        var tvProblemPercent: Double { percent(tvProblems, of: withSubscriptions) }
 
         private func percent(_ part: Int, of whole: Int) -> Double {
             whole == 0 ? 0 : Double(part) / Double(whole) * 100
@@ -43,6 +47,16 @@ enum ServiceReport {
             .joined(separator: " ")
             .lowercased()
         return excludedTypes.contains(normalized)
+    }
+
+    /// Тип заявки содержит «Проблемы с ТВ» (без учёта регистра и лишних пробелов).
+    static func isTVProblem(_ type: String) -> Bool {
+        let normalized = type
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+            .lowercased()
+        return normalized.contains("проблемы с тв")
     }
 
     static func inQuarter(_ request: ServiceRequest) -> Bool {
@@ -98,7 +112,8 @@ enum ServiceReport {
                     settlement: name,
                     subscribers: subs.count,
                     withSubscriptions: subs.filter { !($0.subscriptions ?? []).isEmpty }.count,
-                    requests: (reqByKey[k] ?? []).count
+                    requests: (reqByKey[k] ?? []).count,
+                    tvProblems: (reqByKey[k] ?? []).filter { isTVProblem($0.type) }.count
                 )
             }
             .sorted { $0.settlement.localizedStandardCompare($1.settlement) == .orderedAscending }
@@ -106,7 +121,7 @@ enum ServiceReport {
 
     /// CSV с разделителем «;», строка «Итого» внизу.
     static func csv(_ rows: [Row]) -> String {
-        var lines = ["Населенный пункт;Количество абонентов;Абоненты с подпиской;Процент с подпиской;Количество сервисных заявок;Процент сервисных заявок"]
+        var lines = ["Населенный пункт;Количество абонентов;Абоненты с подпиской;Процент с подпиской;Количество сервисных заявок;Процент сервисных заявок;Проблемы с ТВ;Процент проблем с ТВ"]
 
         for r in rows {
             lines.append([
@@ -116,13 +131,16 @@ enum ServiceReport {
                 String(format: "%.2f", r.subscriptionPercent),
                 "\(r.requests)",
                 String(format: "%.2f", r.requestPercent),
+                "\(r.tvProblems)",
+                String(format: "%.2f", r.tvProblemPercent),
             ].joined(separator: ";"))
         }
 
         let subscribers = rows.reduce(0) { $0 + $1.subscribers }
         let withSubs = rows.reduce(0) { $0 + $1.withSubscriptions }
         let requests = rows.reduce(0) { $0 + $1.requests }
-        let total = Row(settlement: "Итого", subscribers: subscribers, withSubscriptions: withSubs, requests: requests)
+        let tv = rows.reduce(0) { $0 + $1.tvProblems }
+        let total = Row(settlement: "Итого", subscribers: subscribers, withSubscriptions: withSubs, requests: requests, tvProblems: tv)
         lines.append([
             "Итого",
             "\(total.subscribers)",
@@ -130,6 +148,8 @@ enum ServiceReport {
             String(format: "%.2f", total.subscriptionPercent),
             "\(total.requests)",
             String(format: "%.2f", total.requestPercent),
+            "\(total.tvProblems)",
+            String(format: "%.2f", total.tvProblemPercent),
         ].joined(separator: ";"))
 
         return lines.joined(separator: "\r\n") + "\r\n"
