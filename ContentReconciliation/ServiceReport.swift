@@ -43,21 +43,43 @@ enum ServiceReport {
         AnalysisReport.isActive(record) && record.blocked != "1"
     }
 
+    /// Ключ группировки: регистр не важен, латинская «c» — это кириллическая «с»,
+    /// пробелы убираются, а пробел после сокращения типа («с. Визинга» и «с.Визинга») не учитывается.
+    /// Одинаковые по ключу названия считаются одним населённым пунктом.
+    static func key(_ settlement: String) -> String {
+        let fixed = settlement
+            .replacingOccurrences(of: "c", with: "с")
+            .replacingOccurrences(of: "C", with: "с")
+            .lowercased()
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        return fixed.replacingOccurrences(of: ". ", with: ".")
+    }
+
     static func build(records: [UserRecord], requests: [ServiceRequest]) -> [Row] {
         let counted = records.filter { isCounted($0) }
         let quarterRequests = requests.filter { inQuarter($0) }
 
-        let settlements = Set(counted.map { AnalysisReport.settlement(from: $0.address) })
-            .union(quarterRequests.map { AnalysisReport.settlement(from: $0.address) })
+        // Отображаемое название — первое встреченное; группировка — по ключу
+        var display: [String: String] = [:]
+        for name in counted.map({ AnalysisReport.settlement(from: $0.address) })
+            + quarterRequests.map({ AnalysisReport.settlement(from: $0.address) }) {
+            let k = key(name)
+            if display[k] == nil { display[k] = name }
+        }
 
-        return settlements
-            .map { name in
-                let subs = counted.filter { AnalysisReport.settlement(from: $0.address) == name }
+        let subsByKey = Dictionary(grouping: counted) { key(AnalysisReport.settlement(from: $0.address)) }
+        let reqByKey = Dictionary(grouping: quarterRequests) { key(AnalysisReport.settlement(from: $0.address)) }
+
+        return display
+            .map { k, name in
+                let subs = subsByKey[k] ?? []
                 return Row(
                     settlement: name,
                     subscribers: subs.count,
                     withSubscriptions: subs.filter { !($0.subscriptions ?? []).isEmpty }.count,
-                    requests: quarterRequests.filter { AnalysisReport.settlement(from: $0.address) == name }.count
+                    requests: (reqByKey[k] ?? []).count
                 )
             }
             .sorted { $0.settlement.localizedStandardCompare($1.settlement) == .orderedAscending }
