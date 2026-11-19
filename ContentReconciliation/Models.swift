@@ -8,15 +8,33 @@
 
 import Foundation
 
+struct Subscription: Codable, Hashable {
+    let name: String
+    let price: Double
+}
+
 struct UserRecord: Codable, Hashable {
     let uid: String
-    let login: String
+    var login: String
+    var status: String? = nil
+    var token: String? = nil
+    var user: String? = nil
+    var fio: String? = nil
+    var phone: String? = nil
+    var address: String? = nil
+    var mobTel: String? = nil
+    var smsTel: String? = nil
+    var activated: String? = nil
+    var blocked: String? = nil
+    var password: String? = nil
+    var subscriptions: [Subscription]? = nil
 }
 
 enum ImportError: LocalizedError {
     case cannotOpen(String)
     case noSheets
     case emptySheet
+    case sheetNotFound(String)
     case columnsNotFound([String])
 
     var errorDescription: String? {
@@ -27,6 +45,8 @@ enum ImportError: LocalizedError {
             return "В файле нет листов"
         case .emptySheet:
             return "Первый лист пуст"
+        case .sheetNotFound(let name):
+            return "В файле нет листа «\(name)»"
         case .columnsNotFound(let names):
             return "Не найдены столбцы: \(names.joined(separator: ", "))"
         }
@@ -55,5 +75,23 @@ enum DataStore {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(records)
         try data.write(to: fileURL, options: .atomic)
+    }
+
+    /// Сервисные заявки хранятся отдельно, рядом с data.json, чтобы не менять формат абонентов.
+    static var requestsFileURL: URL {
+        fileURL.deletingLastPathComponent().appendingPathComponent("service_requests.json")
+    }
+
+    static func loadRequests() throws -> [ServiceRequest] {
+        guard FileManager.default.fileExists(atPath: requestsFileURL.path) else { return [] }
+        let data = try Data(contentsOf: requestsFileURL)
+        return try JSONDecoder().decode([ServiceRequest].self, from: data)
+    }
+
+    static func saveRequests(_ requests: [ServiceRequest]) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(requests)
+        try data.write(to: requestsFileURL, options: .atomic)
     }
 }
