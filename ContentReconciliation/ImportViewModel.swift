@@ -204,6 +204,34 @@ final class ImportViewModel: ObservableObject {
 
     /// Строит отчёт по населённым пунктам и сохраняет его в Загрузки/analiz.csv.
     /// На экран отчёт не выводится; в журнале пишутся только шаги и итоги.
+    /// Отчёт по сервису за 3 квартал 2026 в «Загрузки/service_report_q3_2026.csv».
+    func exportServiceReport() {
+        guard !records.isEmpty else {
+            log("Нет записей: сначала выполните импорт")
+            return
+        }
+
+        let rows = ServiceReport.build(records: records, requests: requests)
+        let csv = ServiceReport.csv(rows)
+        let quarterRequests = requests.filter { ServiceReport.inQuarter($0) }.count
+        log("Отчёт по сервису, 3 кв. 2026: населённых пунктов \(rows.count), заявок в квартале \(quarterRequests)")
+
+        guard let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else {
+            log("Ошибка отчёта: папка «Загрузки» не найдена")
+            return
+        }
+        let fileURL = downloads.appendingPathComponent("service_report_q3_2026.csv")
+
+        do {
+            var data = Data([0xEF, 0xBB, 0xBF])
+            data.append(Data(csv.utf8))
+            try data.write(to: fileURL, options: .atomic)
+            log("Отчёт сохранён: \(fileURL.path)")
+        } catch {
+            log("Ошибка сохранения отчёта: \(error.localizedDescription)")
+        }
+    }
+
     func analyze() {
         guard !records.isEmpty else {
             log("Нет записей: сначала выполните импорт")
