@@ -50,6 +50,10 @@ struct ContentView: View {
                 }
                 .disabled(vm.records.allSatisfy { $0.token == nil } || isBusy)
 
+                Spacer()
+            }
+
+            HStack(spacing: 8) {
                 Button("Экспорт статистики") {
                     vm.analyze()
                 }
