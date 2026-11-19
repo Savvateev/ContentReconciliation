@@ -212,7 +212,8 @@ final class ImportViewModel: ObservableObject {
         }
 
         let rows = ServiceReport.build(records: records, requests: requests)
-        let csv = ServiceReport.csv(rows)
+        let repeats = ServiceReport.repeatSubscribers(records: records, requests: requests)
+        let csv = ServiceReport.csv(rows, repeats: repeats)
         let quarterRequests = requests.filter { ServiceReport.inQuarter($0) }.count
         let noDate = requests.filter { ServiceReport.createdDate($0.createdAt) == nil }.count
         log("Отчёт по сервису, 3 кв. 2026: населённых пунктов \(rows.count), заявок в квартале \(quarterRequests)")

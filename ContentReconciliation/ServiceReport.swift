@@ -13,15 +13,26 @@ enum ServiceReport {
         let requests: Int
         /// Заявки квартала, в типе которых есть «Проблемы с ТВ».
         let tvProblems: Int
+        /// Заявки квартала, у которых логин встречается в этом пункте 2 и более раза.
+        let repeatRequests: Int
 
         var subscriptionPercent: Double { percent(withSubscriptions, of: subscribers) }
         var requestPercent: Double { percent(requests, of: subscribers) }
         /// Проблемы с ТВ от абонентов с подпиской.
         var tvProblemPercent: Double { percent(tvProblems, of: withSubscriptions) }
+        /// Повторные заявки от количества абонентов.
+        var repeatPercent: Double { percent(repeatRequests, of: subscribers) }
 
         private func percent(_ part: Int, of whole: Int) -> Double {
             whole == 0 ? 0 : Double(part) / Double(whole) * 100
         }
+    }
+
+    /// Абонент с повторными заявками в пункте.
+    struct RepeatSubscriber {
+        let login: String
+        let settlement: String
+        let count: Int
     }
 
     /// Третий квартал 2026: с 01.07.2026 по 30.09.2026 включительно.
@@ -40,23 +51,21 @@ enum ServiceReport {
     /// Типы заявок, которые не входят в отчёт.
     static let excludedTypes: Set<String> = ["си подключение"]
 
-    static func isExcludedType(_ type: String) -> Bool {
-        let normalized = type
+    static func normalizedType(_ type: String) -> String {
+        type
             .components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }
             .joined(separator: " ")
             .lowercased()
-        return excludedTypes.contains(normalized)
+    }
+
+    static func isExcludedType(_ type: String) -> Bool {
+        excludedTypes.contains(normalizedType(type))
     }
 
     /// Тип заявки содержит «Проблемы с ТВ» (без учёта регистра и лишних пробелов).
     static func isTVProblem(_ type: String) -> Bool {
-        let normalized = type
-            .components(separatedBy: .whitespacesAndNewlines)
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
-            .lowercased()
-        return normalized.contains("проблемы с тв")
+        normalizedType(type).contains("проблемы с тв")
     }
 
     static func inQuarter(_ request: ServiceRequest) -> Bool {
@@ -71,7 +80,7 @@ enum ServiceReport {
 
     /// Ключ группировки: регистр не важен, латинская «c» — это кириллическая «с»,
     /// пробелы убираются, а пробел после сокращения типа («с. Визинга» и «с.Визинга») не учитывается.
-    /// Одинаковые по ключу названия считаются одним населённым пунктом.
+    /// «город Черемхово (МС)» приравнивается к «г. Черемхово».
     static func key(_ settlement: String) -> String {
         var fixed = settlement
             .replacingOccurrences(of: "c", with: "с")
@@ -80,7 +89,6 @@ enum ServiceReport {
             .components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }
             .joined(separator: " ")
-        // «город Черемхово (МС)» — это то же самое, что «г. Черемхово»
         fixed = fixed.replacingOccurrences(of: " (мс)", with: "")
         if fixed.hasPrefix("город ") {
             fixed = "г." + fixed.dropFirst("город".count)
@@ -88,40 +96,84 @@ enum ServiceReport {
         return fixed.replacingOccurrences(of: ". ", with: ".")
     }
 
-    static func build(records: [UserRecord], requests: [ServiceRequest]) -> [Row] {
+    /// Название пункта для вывода: самое частое написание в данных, по ключу.
+    static func displayNames(records: [UserRecord], requests: [ServiceRequest]) -> [String: String] {
         let counted = records.filter { isCounted($0) }
         let quarterRequests = requests.filter { inQuarter($0) }
 
-        // Группировка — по ключу; название в строке — самое частое написание в данных
         var spellings: [String: [String: Int]] = [:]
         for name in counted.map({ AnalysisReport.settlement(from: $0.address) })
             + quarterRequests.map({ AnalysisReport.settlement(from: $0.address) }) {
             spellings[key(name), default: [:]][name, default: 0] += 1
         }
-        let display: [String: String] = spellings.mapValues { variants in
+        return spellings.mapValues { variants in
             variants.max { a, b in a.value == b.value ? a.key > b.key : a.value < b.value }!.key
         }
+    }
+
+    /// Число заявок квартала по логину в каждом пункте (пустые логины пропускаются).
+    private static func loginCounts(_ requests: [ServiceRequest]) -> [(settlementKey: String, login: String, count: Int)] {
+        var counts: [String: Int] = [:]
+        var sample: [String: (settlementKey: String, login: String)] = [:]
+        for r in requests {
+            let login = r.login.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !login.isEmpty else { continue }
+            let sk = key(AnalysisReport.settlement(from: r.address))
+            let id = sk + "|" + login.lowercased()
+            counts[id, default: 0] += 1
+            if sample[id] == nil { sample[id] = (sk, login) }
+        }
+        return counts.compactMap { id, n in
+            guard let s = sample[id] else { return nil }
+            return (s.settlementKey, s.login, n)
+        }
+    }
+
+    static func build(records: [UserRecord], requests: [ServiceRequest]) -> [Row] {
+        let counted = records.filter { isCounted($0) }
+        let quarterRequests = requests.filter { inQuarter($0) }
+        let display = displayNames(records: records, requests: requests)
 
         let subsByKey = Dictionary(grouping: counted) { key(AnalysisReport.settlement(from: $0.address)) }
         let reqByKey = Dictionary(grouping: quarterRequests) { key(AnalysisReport.settlement(from: $0.address)) }
+        let repeatByKey = Dictionary(grouping: loginCounts(quarterRequests).filter { $0.count >= 2 }) { $0.settlementKey }
 
         return display
             .map { k, name in
                 let subs = subsByKey[k] ?? []
+                let reqs = reqByKey[k] ?? []
                 return Row(
                     settlement: name,
                     subscribers: subs.count,
                     withSubscriptions: subs.filter { !($0.subscriptions ?? []).isEmpty }.count,
-                    requests: (reqByKey[k] ?? []).count,
-                    tvProblems: (reqByKey[k] ?? []).filter { isTVProblem($0.type) }.count
+                    requests: reqs.count,
+                    tvProblems: reqs.filter { isTVProblem($0.type) }.count,
+                    repeatRequests: (repeatByKey[k] ?? []).reduce(0) { $0 + $1.count }
                 )
             }
             .sorted { $0.settlement.localizedStandardCompare($1.settlement) == .orderedAscending }
     }
 
-    /// CSV с разделителем «;», строка «Итого» внизу.
-    static func csv(_ rows: [Row]) -> String {
-        var lines = ["Населенный пункт;Количество абонентов;Абоненты с подпиской;Процент с подпиской;Количество сервисных заявок;Процент сервисных заявок;Проблемы с ТВ;Процент проблем с ТВ"]
+    /// Абоненты с повторными заявками: логин встречается 2 и более раза в пункте.
+    static func repeatSubscribers(records: [UserRecord], requests: [ServiceRequest]) -> [RepeatSubscriber] {
+        let quarterRequests = requests.filter { inQuarter($0) }
+        let display = displayNames(records: records, requests: requests)
+
+        return loginCounts(quarterRequests)
+            .filter { $0.count >= 2 }
+            .map { RepeatSubscriber(login: $0.login, settlement: display[$0.settlementKey] ?? $0.settlementKey, count: $0.count) }
+            .sorted {
+                if $0.settlement != $1.settlement {
+                    return $0.settlement.localizedStandardCompare($1.settlement) == .orderedAscending
+                }
+                if $0.count != $1.count { return $0.count > $1.count }
+                return $0.login.localizedStandardCompare($1.login) == .orderedAscending
+            }
+    }
+
+    /// CSV с разделителем «;». Таблица, строка «Итого», затем список абонентов с повторными заявками.
+    static func csv(_ rows: [Row], repeats: [RepeatSubscriber]) -> String {
+        var lines = ["Населенный пункт;Количество абонентов;Абоненты с подпиской;Процент с подпиской;Количество сервисных заявок;Процент сервисных заявок;Проблемы с ТВ;Процент проблем с ТВ;Повторные заявки;Процент повторных заявок"]
 
         for r in rows {
             lines.append([
@@ -133,6 +185,8 @@ enum ServiceReport {
                 String(format: "%.2f", r.requestPercent),
                 "\(r.tvProblems)",
                 String(format: "%.2f", r.tvProblemPercent),
+                "\(r.repeatRequests)",
+                String(format: "%.2f", r.repeatPercent),
             ].joined(separator: ";"))
         }
 
@@ -140,7 +194,9 @@ enum ServiceReport {
         let withSubs = rows.reduce(0) { $0 + $1.withSubscriptions }
         let requests = rows.reduce(0) { $0 + $1.requests }
         let tv = rows.reduce(0) { $0 + $1.tvProblems }
-        let total = Row(settlement: "Итого", subscribers: subscribers, withSubscriptions: withSubs, requests: requests, tvProblems: tv)
+        let repeatReqs = rows.reduce(0) { $0 + $1.repeatRequests }
+        let total = Row(settlement: "Итого", subscribers: subscribers, withSubscriptions: withSubs,
+                        requests: requests, tvProblems: tv, repeatRequests: repeatReqs)
         lines.append([
             "Итого",
             "\(total.subscribers)",
@@ -150,7 +206,17 @@ enum ServiceReport {
             String(format: "%.2f", total.requestPercent),
             "\(total.tvProblems)",
             String(format: "%.2f", total.tvProblemPercent),
+            "\(total.repeatRequests)",
+            String(format: "%.2f", total.repeatPercent),
         ].joined(separator: ";"))
+
+        // Список абонентов с повторными заявками ниже таблицы
+        lines.append("")
+        lines.append("Абоненты с повторными заявками")
+        lines.append("Логин;Город;Количество заявок")
+        for s in repeats {
+            lines.append([escape(s.login), escape(s.settlement), "\(s.count)"].joined(separator: ";"))
+        }
 
         return lines.joined(separator: "\r\n") + "\r\n"
     }
