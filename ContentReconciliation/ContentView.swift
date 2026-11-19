@@ -68,7 +68,7 @@ struct ContentView: View {
             GroupBox("Сервисные заявки: \(vm.requests.count)") {
                 List(Array(vm.requests.enumerated()), id: \.offset) { _, item in
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("№ \(item.number) · логин \(item.login) · \(item.type)")
+                        Text("№ \(item.number) · логин \(item.login) · \(item.type) · создана \(item.createdAt)")
                         Text(item.address)
                             .foregroundStyle(.secondary)
                         if !item.comment.isEmpty {

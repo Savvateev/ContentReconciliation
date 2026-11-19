@@ -9,15 +9,17 @@ struct ServiceRequest: Codable, Hashable {
     let type: String
     let description: String
     let comment: String
+    let createdAt: String
 
     // Старые записи в service_requests.json не содержат description, поэтому читаем со значением по умолчанию
-    init(number: String, login: String, address: String, type: String, description: String, comment: String) {
+    init(number: String, login: String, address: String, type: String, description: String, comment: String, createdAt: String) {
         self.number = number
         self.login = login
         self.address = address
         self.type = type
         self.description = description
         self.comment = comment
+        self.createdAt = createdAt
     }
 
     init(from decoder: Decoder) throws {
@@ -28,6 +30,7 @@ struct ServiceRequest: Codable, Hashable {
         type = try c.decode(String.self, forKey: .type)
         description = try c.decodeIfPresent(String.self, forKey: .description) ?? ""
         comment = try c.decode(String.self, forKey: .comment)
+        createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt) ?? ""
     }
 }
 
@@ -44,6 +47,7 @@ enum ServiceRequestReader {
         ("type", ["тип заявки"]),
         ("description", ["описание заявки"]),
         ("comment", ["комментарий при выполнении"]),
+        ("createdAt", ["дата создания"]),
     ]
 
     static func read(from path: String, progress: (String) -> Void) throws -> [ServiceRequest] {
@@ -108,7 +112,8 @@ enum ServiceRequestReader {
                 address: SheetHelpers.value(in: row, column: columns["address"]!, sharedStrings),
                 type: SheetHelpers.value(in: row, column: columns["type"]!, sharedStrings),
                 description: SheetHelpers.value(in: row, column: columns["description"]!, sharedStrings),
-                comment: SheetHelpers.value(in: row, column: columns["comment"]!, sharedStrings)
+                comment: SheetHelpers.value(in: row, column: columns["comment"]!, sharedStrings),
+                createdAt: SheetHelpers.value(in: row, column: columns["createdAt"]!, sharedStrings)
             )
             // Пустую строку (без номера и логина) пропускаем
             if item.number.isEmpty && item.login.isEmpty {
