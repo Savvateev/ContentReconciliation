@@ -17,7 +17,7 @@ enum ServiceRequestReader {
 
     /// Нужные колонки и варианты их заголовков (без учёта регистра и лишних пробелов).
     static let columnTitles: [(key: String, titles: Set<String>)] = [
-        ("number", ["номер заявки"]),
+        ("number", ["номер заявки", "№ заявки"]),
         ("login", ["логин", "login"]),
         ("address", ["адрес"]),
         ("type", ["тип заявки"]),
