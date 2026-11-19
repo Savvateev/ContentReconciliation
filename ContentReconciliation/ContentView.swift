@@ -18,6 +18,11 @@ struct ContentView: View {
                 .keyboardShortcut("o", modifiers: .command)
                 .disabled(isBusy)
 
+                Button("Импорт сервисных заявок…") {
+                    vm.showRequestsImporter = true
+                }
+                .disabled(isBusy)
+
                 Button("Получить токены") {
                     Task { await vm.fetchTokens() }
                 }
@@ -56,6 +61,23 @@ struct ContentView: View {
                 .frame(minHeight: 200)
             }
 
+            GroupBox("Сервисные заявки: \(vm.requests.count)") {
+                List(Array(vm.requests.enumerated()), id: \.offset) { _, item in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("№ \(item.number) · логин \(item.login) · \(item.type)")
+                        Text(item.address)
+                            .foregroundStyle(.secondary)
+                        if !item.comment.isEmpty {
+                            Text(item.comment)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .font(.callout)
+                    .textSelection(.enabled)
+                }
+                .frame(minHeight: 120)
+            }
+
             GroupBox("Журнал") {
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -92,6 +114,20 @@ struct ContentView: View {
                 }
             case .failure(let error):
                 vm.log("Выбор файла отменён или с ошибкой: \(error.localizedDescription)")
+            }
+        }
+        .fileImporter(
+            isPresented: $vm.showRequestsImporter,
+            allowedContentTypes: [xlsxType],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                if let url = urls.first {
+                    vm.importRequests(url)
+                }
+            case .failure(let error):
+                vm.log("Выбор файла заявок отменён или с ошибкой: \(error.localizedDescription)")
             }
         }
     }

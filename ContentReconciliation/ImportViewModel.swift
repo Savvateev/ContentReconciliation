@@ -15,6 +15,8 @@ final class ImportViewModel: ObservableObject {
     @Published var records: [UserRecord] = []
     @Published var logs: [String] = []
     @Published var showImporter = false
+    @Published var requests: [ServiceRequest] = []
+    @Published var showRequestsImporter = false
     @Published var isFetchingTokens = false
     @Published var isFetchingData = false
 
@@ -27,6 +29,51 @@ final class ImportViewModel: ObservableObject {
             removeDuplicateUIDs()
         } catch {
             log("Ошибка чтения файла данных: \(error.localizedDescription)")
+        }
+        do {
+            requests = try DataStore.loadRequests()
+            log("Загружены заявки: \(requests.count)")
+        } catch {
+            log("Ошибка чтения файла заявок: \(error.localizedDescription)")
+        }
+    }
+
+    /// Импорт сервисных заявок из первого листа файла. Заявка с тем же номером заменяется.
+    func importRequests(_ url: URL) {
+        log("Выбран файл заявок: \(url.lastPathComponent)")
+
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+
+        do {
+            let imported = try ServiceRequestReader.read(from: url.path) { message in
+                self.log(message)
+            }
+
+            var merged = requests
+            var indexByNumber: [String: Int] = [:]
+            for (index, item) in merged.enumerated() where indexByNumber[item.number] == nil {
+                indexByNumber[item.number] = index
+            }
+
+            var added = 0
+            var replaced = 0
+            for item in imported {
+                if let index = indexByNumber[item.number] {
+                    merged[index] = item
+                    replaced += 1
+                } else {
+                    indexByNumber[item.number] = merged.count
+                    merged.append(item)
+                    added += 1
+                }
+            }
+
+            try DataStore.saveRequests(merged)
+            requests = merged
+            log("Заявки: добавлено \(added), заменено \(replaced). Всего заявок: \(merged.count)")
+        } catch {
+            log("Ошибка импорта заявок: \(error.localizedDescription)")
         }
     }
 

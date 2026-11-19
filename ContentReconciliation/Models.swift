@@ -76,4 +76,22 @@ enum DataStore {
         let data = try encoder.encode(records)
         try data.write(to: fileURL, options: .atomic)
     }
+
+    /// Сервисные заявки хранятся отдельно, рядом с data.json, чтобы не менять формат абонентов.
+    static var requestsFileURL: URL {
+        fileURL.deletingLastPathComponent().appendingPathComponent("service_requests.json")
+    }
+
+    static func loadRequests() throws -> [ServiceRequest] {
+        guard FileManager.default.fileExists(atPath: requestsFileURL.path) else { return [] }
+        let data = try Data(contentsOf: requestsFileURL)
+        return try JSONDecoder().decode([ServiceRequest].self, from: data)
+    }
+
+    static func saveRequests(_ requests: [ServiceRequest]) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(requests)
+        try data.write(to: requestsFileURL, options: .atomic)
+    }
 }
