@@ -23,6 +23,16 @@ struct ContentView: View {
                 }
                 .disabled(isBusy)
 
+                Button("Получить токены") {
+                    Task { await vm.fetchTokens() }
+                }
+                .disabled(vm.records.isEmpty || isBusy)
+
+                Button("Получить данные") {
+                    Task { await vm.fetchData() }
+                }
+                .disabled(vm.records.isEmpty || isBusy)
+
                 if isBusy {
                     ProgressView()
                         .controlSize(.small)
@@ -35,16 +45,6 @@ struct ContentView: View {
             }
 
             HStack(spacing: 8) {
-                Button("Получить токены") {
-                    Task { await vm.fetchTokens() }
-                }
-                .disabled(vm.records.isEmpty || isBusy)
-
-                Button("Получить данные") {
-                    Task { await vm.fetchData() }
-                }
-                .disabled(vm.records.isEmpty || isBusy)
-
                 Button("Экспорт user info") {
                     Task { await vm.exportUserInfo() }
                 }
