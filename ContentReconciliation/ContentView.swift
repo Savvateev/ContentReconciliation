@@ -55,10 +55,6 @@ struct ContentView: View {
                 }
                 .disabled(vm.records.isEmpty || isBusy)
 
-                Spacer()
-            }
-
-            HStack(spacing: 8) {
                 Button("Отчет по сервису за 3 кв.") {
                     vm.exportServiceReport()
                 }
