@@ -7,7 +7,28 @@ struct ServiceRequest: Codable, Hashable {
     let login: String
     let address: String
     let type: String
+    let description: String
     let comment: String
+
+    // Старые записи в service_requests.json не содержат description, поэтому читаем со значением по умолчанию
+    init(number: String, login: String, address: String, type: String, description: String, comment: String) {
+        self.number = number
+        self.login = login
+        self.address = address
+        self.type = type
+        self.description = description
+        self.comment = comment
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        number = try c.decode(String.self, forKey: .number)
+        login = try c.decode(String.self, forKey: .login)
+        address = try c.decode(String.self, forKey: .address)
+        type = try c.decode(String.self, forKey: .type)
+        description = try c.decodeIfPresent(String.self, forKey: .description) ?? ""
+        comment = try c.decode(String.self, forKey: .comment)
+    }
 }
 
 /// Читает сервисные заявки с первого листа файла.
@@ -21,6 +42,7 @@ enum ServiceRequestReader {
         ("login", ["логин", "login"]),
         ("address", ["адрес"]),
         ("type", ["тип заявки"]),
+        ("description", ["описание заявки"]),
         ("comment", ["комментарий при выполнении"]),
     ]
 
@@ -85,6 +107,7 @@ enum ServiceRequestReader {
                 login: SheetHelpers.value(in: row, column: columns["login"]!, sharedStrings),
                 address: SheetHelpers.value(in: row, column: columns["address"]!, sharedStrings),
                 type: SheetHelpers.value(in: row, column: columns["type"]!, sharedStrings),
+                description: SheetHelpers.value(in: row, column: columns["description"]!, sharedStrings),
                 comment: SheetHelpers.value(in: row, column: columns["comment"]!, sharedStrings)
             )
             // Пустую строку (без номера и логина) пропускаем

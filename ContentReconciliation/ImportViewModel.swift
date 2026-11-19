@@ -50,28 +50,13 @@ final class ImportViewModel: ObservableObject {
                 self.log(message)
             }
 
-            var merged = requests
-            var indexByNumber: [String: Int] = [:]
-            for (index, item) in merged.enumerated() where indexByNumber[item.number] == nil {
-                indexByNumber[item.number] = index
-            }
-
-            var added = 0
-            var replaced = 0
-            for item in imported {
-                if let index = indexByNumber[item.number] {
-                    merged[index] = item
-                    replaced += 1
-                } else {
-                    indexByNumber[item.number] = merged.count
-                    merged.append(item)
-                    added += 1
-                }
-            }
-
-            try DataStore.saveRequests(merged)
-            requests = merged
-            log("Заявки: добавлено \(added), заменено \(replaced). Всего заявок: \(merged.count)")
+            // Новый файл полностью заменяет прежний набор заявок: обновляются все поля,
+            // заявки, которых нет в файле, убираются. Повторы номера внутри файла сохраняются.
+            let previousCount = requests.count
+            let removed = requests.filter { old in !imported.contains(where: { $0.number == old.number }) }.count
+            try DataStore.saveRequests(imported)
+            requests = imported
+            log("Заявки: записано \(imported.count), было \(previousCount), убрано отсутствующих в файле \(removed)")
         } catch {
             log("Ошибка импорта заявок: \(error.localizedDescription)")
         }
