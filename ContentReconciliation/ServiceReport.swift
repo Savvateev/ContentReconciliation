@@ -33,9 +33,21 @@ enum ServiceReport {
         return f.date(from: text.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
+    /// Типы заявок, которые не входят в отчёт.
+    static let excludedTypes: Set<String> = ["си подключение"]
+
+    static func isExcludedType(_ type: String) -> Bool {
+        let normalized = type
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+            .lowercased()
+        return excludedTypes.contains(normalized)
+    }
+
     static func inQuarter(_ request: ServiceRequest) -> Bool {
         guard let date = createdDate(request.createdAt) else { return false }
-        return date >= quarterStart && date < quarterEnd
+        return date >= quarterStart && date < quarterEnd && !isExcludedType(request.type)
     }
 
     /// Абонент учитывается, если он не удалён и не заблокирован.
