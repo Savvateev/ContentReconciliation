@@ -47,13 +47,18 @@ enum ServiceReport {
     /// пробелы убираются, а пробел после сокращения типа («с. Визинга» и «с.Визинга») не учитывается.
     /// Одинаковые по ключу названия считаются одним населённым пунктом.
     static func key(_ settlement: String) -> String {
-        let fixed = settlement
+        var fixed = settlement
             .replacingOccurrences(of: "c", with: "с")
             .replacingOccurrences(of: "C", with: "с")
             .lowercased()
             .components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }
             .joined(separator: " ")
+        // «город Черемхово (МС)» — это то же самое, что «г. Черемхово»
+        fixed = fixed.replacingOccurrences(of: " (мс)", with: "")
+        if fixed.hasPrefix("город ") {
+            fixed = "г." + fixed.dropFirst("город".count)
+        }
         return fixed.replacingOccurrences(of: ". ", with: ".")
     }
 
@@ -61,12 +66,14 @@ enum ServiceReport {
         let counted = records.filter { isCounted($0) }
         let quarterRequests = requests.filter { inQuarter($0) }
 
-        // Отображаемое название — первое встреченное; группировка — по ключу
-        var display: [String: String] = [:]
+        // Группировка — по ключу; название в строке — самое частое написание в данных
+        var spellings: [String: [String: Int]] = [:]
         for name in counted.map({ AnalysisReport.settlement(from: $0.address) })
             + quarterRequests.map({ AnalysisReport.settlement(from: $0.address) }) {
-            let k = key(name)
-            if display[k] == nil { display[k] = name }
+            spellings[key(name), default: [:]][name, default: 0] += 1
+        }
+        let display: [String: String] = spellings.mapValues { variants in
+            variants.max { a, b in a.value == b.value ? a.key > b.key : a.value < b.value }!.key
         }
 
         let subsByKey = Dictionary(grouping: counted) { key(AnalysisReport.settlement(from: $0.address)) }
