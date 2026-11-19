@@ -98,11 +98,11 @@ enum AnalysisReport {
         for row in rows {
             var cells = [
                 escape(row.settlement),
-                "\(row.total)",
-                "\(row.unblocked)",
-                "\(row.subscribers)"
+                ServiceReport.grouped(row.total),
+                ServiceReport.grouped(row.unblocked),
+                ServiceReport.grouped(row.subscribers)
             ]
-            cells += Operator.allCases.map { "\(row.byOperator[$0] ?? 0)" }
+            cells += Operator.allCases.map { ServiceReport.grouped(row.byOperator[$0] ?? 0) }
             cells += Operator.allCases.map { percent(row.byOperator[$0] ?? 0, of: row.unblocked) }
             cells += [String(format: "%.2f", row.percent)]
             lines.append(cells.joined(separator: ";"))
@@ -117,8 +117,8 @@ enum AnalysisReport {
         })
         let totalPercent = unblocked == 0 ? 0 : Double(subscribers) / Double(unblocked) * 100
 
-        var totalCells = ["Итого", "\(total)", "\(unblocked)", "\(subscribers)"]
-        totalCells += Operator.allCases.map { "\(totalByOperator[$0] ?? 0)" }
+        var totalCells = ["Итого", ServiceReport.grouped(total), ServiceReport.grouped(unblocked), ServiceReport.grouped(subscribers)]
+        totalCells += Operator.allCases.map { ServiceReport.grouped(totalByOperator[$0] ?? 0) }
         totalCells += Operator.allCases.map { percent(totalByOperator[$0] ?? 0, of: unblocked) }
         totalCells += [String(format: "%.2f", totalPercent)]
         lines.append(totalCells.joined(separator: ";"))

@@ -178,14 +178,14 @@ enum ServiceReport {
         for r in rows {
             lines.append([
                 escape(r.settlement),
-                "\(r.subscribers)",
-                "\(r.withSubscriptions)",
+                "\(grouped(r.subscribers))",
+                "\(grouped(r.withSubscriptions))",
                 String(format: "%.2f", r.subscriptionPercent),
-                "\(r.requests)",
+                "\(grouped(r.requests))",
                 String(format: "%.2f", r.requestPercent),
-                "\(r.tvProblems)",
+                "\(grouped(r.tvProblems))",
                 String(format: "%.2f", r.tvProblemPercent),
-                "\(r.repeatRequests)",
+                "\(grouped(r.repeatRequests))",
                 String(format: "%.2f", r.repeatPercent),
             ].joined(separator: ";"))
         }
@@ -199,14 +199,14 @@ enum ServiceReport {
                         requests: requests, tvProblems: tv, repeatRequests: repeatReqs)
         lines.append([
             "Итого",
-            "\(total.subscribers)",
-            "\(total.withSubscriptions)",
+            "\(grouped(total.subscribers))",
+            "\(grouped(total.withSubscriptions))",
             String(format: "%.2f", total.subscriptionPercent),
-            "\(total.requests)",
+            "\(grouped(total.requests))",
             String(format: "%.2f", total.requestPercent),
-            "\(total.tvProblems)",
+            "\(grouped(total.tvProblems))",
             String(format: "%.2f", total.tvProblemPercent),
-            "\(total.repeatRequests)",
+            "\(grouped(total.repeatRequests))",
             String(format: "%.2f", total.repeatPercent),
         ].joined(separator: ";"))
 
@@ -215,10 +215,21 @@ enum ServiceReport {
         lines.append("Абоненты с повторными заявками")
         lines.append("Логин;Город;Количество заявок")
         for s in repeats {
-            lines.append([escape(s.login), escape(s.settlement), "\(s.count)"].joined(separator: ";"))
+            lines.append([escape(s.login), escape(s.settlement), "\(grouped(s.count))"].joined(separator: ";"))
         }
 
         return lines.joined(separator: "\r\n") + "\r\n"
+    }
+
+    /// Целое число с запятой как разделителем разрядов: 1217 → 1,217.
+    static func grouped(_ n: Int) -> String {
+        let digits = String(abs(n))
+        var out = ""
+        for (i, ch) in digits.enumerated() {
+            if i > 0 && (digits.count - i) % 3 == 0 { out += "," }
+            out.append(ch)
+        }
+        return n < 0 ? "-" + out : out
     }
 
     private static func escape(_ field: String) -> String {
