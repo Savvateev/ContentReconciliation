@@ -180,13 +180,13 @@ enum ServiceReport {
                 escape(r.settlement),
                 "\(r.subscribers)",
                 "\(r.withSubscriptions)",
-                String(format: "%.2f", r.subscriptionPercent),
+                decimal(r.subscriptionPercent),
                 "\(r.requests)",
-                String(format: "%.2f", r.requestPercent),
+                decimal(r.requestPercent),
                 "\(r.tvProblems)",
-                String(format: "%.2f", r.tvProblemPercent),
+                decimal(r.tvProblemPercent),
                 "\(r.repeatRequests)",
-                String(format: "%.2f", r.repeatPercent),
+                decimal(r.repeatPercent),
             ].joined(separator: ";"))
         }
 
@@ -201,13 +201,13 @@ enum ServiceReport {
             "Итого",
             "\(total.subscribers)",
             "\(total.withSubscriptions)",
-            String(format: "%.2f", total.subscriptionPercent),
+            decimal(total.subscriptionPercent),
             "\(total.requests)",
-            String(format: "%.2f", total.requestPercent),
+            decimal(total.requestPercent),
             "\(total.tvProblems)",
-            String(format: "%.2f", total.tvProblemPercent),
+            decimal(total.tvProblemPercent),
             "\(total.repeatRequests)",
-            String(format: "%.2f", total.repeatPercent),
+            decimal(total.repeatPercent),
         ].joined(separator: ";"))
 
         // Список абонентов с повторными заявками ниже таблицы
@@ -219,6 +219,11 @@ enum ServiceReport {
         }
 
         return lines.joined(separator: "\r\n") + "\r\n"
+    }
+
+    /// Дробное число с двумя знаками и запятой как десятичным разделителем: 12.5 → 12,50.
+    static func decimal(_ value: Double) -> String {
+        String(format: "%.2f", value).replacingOccurrences(of: ".", with: ",")
     }
 
     private static func escape(_ field: String) -> String {
