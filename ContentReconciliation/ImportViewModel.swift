@@ -214,7 +214,11 @@ final class ImportViewModel: ObservableObject {
         let rows = ServiceReport.build(records: records, requests: requests)
         let csv = ServiceReport.csv(rows)
         let quarterRequests = requests.filter { ServiceReport.inQuarter($0) }.count
+        let noDate = requests.filter { ServiceReport.createdDate($0.createdAt) == nil }.count
         log("Отчёт по сервису, 3 кв. 2026: населённых пунктов \(rows.count), заявок в квартале \(quarterRequests)")
+        if noDate > 0 {
+            log("Внимание: у \(noDate) заявок нет даты создания. Загрузите файл заявок заново, чтобы даты подтянулись")
+        }
 
         guard let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else {
             log("Ошибка отчёта: папка «Загрузки» не найдена")
