@@ -226,7 +226,7 @@ final class ImportViewModel: ObservableObject {
         }
 
         let withData = records.filter { $0.address != nil || $0.subscriptions != nil }.count
-        log("Анализ: записей \(records.count), с данными из cabinet/user: \(withData)")
+        log("Экспорт статистики: записей \(records.count), с данными из cabinet/user: \(withData)")
         if withData < records.count {
             log("Внимание: у \(records.count - withData) записей нет данных, нажмите «Получить данные»")
         }

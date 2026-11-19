@@ -11,7 +11,7 @@ struct ContentView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
 
-            HStack {
+            HStack(spacing: 8) {
                 Button("Импорт UID Login…") {
                     vm.showImporter = true
                 }
@@ -23,6 +23,18 @@ struct ContentView: View {
                 }
                 .disabled(isBusy)
 
+                if isBusy {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+
+                Spacer()
+
+                Text("Записей: \(vm.records.count)")
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 8) {
                 Button("Получить токены") {
                     Task { await vm.fetchTokens() }
                 }
@@ -38,20 +50,12 @@ struct ContentView: View {
                 }
                 .disabled(vm.records.allSatisfy { $0.token == nil } || isBusy)
 
-                Button("Анализ") {
+                Button("Экспорт статистики") {
                     vm.analyze()
                 }
                 .disabled(vm.records.isEmpty || isBusy)
 
-                if isBusy {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-
                 Spacer()
-
-                Text("Записей: \(vm.records.count)")
-                    .foregroundStyle(.secondary)
             }
 
             GroupBox("Данные") {

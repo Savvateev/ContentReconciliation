@@ -63,6 +63,15 @@ enum ServiceRequestReader {
         }
 
         guard let headerIndex else {
+            // Показываем, что нашлось в первых строках, чтобы было видно, какого заголовка не хватает
+            for (index, row) in rows.prefix(maxHeaderSearchRows).enumerated() {
+                let names = row.cells
+                    .map { SheetHelpers.normalize(SheetHelpers.text(of: $0, sharedStrings)) }
+                    .filter { !$0.isEmpty }
+                if !names.isEmpty {
+                    progress("Строка \(index + 1): \(names.joined(separator: " | "))")
+                }
+            }
             let missing = columnTitles.filter { columns[$0.key] == nil }.map { $0.titles.first ?? $0.key }
             throw ImportError.columnsNotFound(missing)
         }
